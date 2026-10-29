@@ -1,0 +1,28 @@
+THIRD PARTY SOFTWARE NOTICE
+
+Product:
+BytePlus MediaKit CLI (@byteplus/mediakit-cli / byteplus-mediakit-cli)
+
+Portions of this product contain third-party open source software. The
+following notices are provided for attribution and license compliance.
+
+| Component | License | URL |
+| :--- | :--- | :--- |
+| github.com/inconshreveable/mousetrap | Apache-2.0 | https://github.com/inconshreveable/mousetrap |
+| github.com/russross/blackfriday/v2 | BSD-2-Clause | https://github.com/russross/blackfriday |
+| github.com/spf13/cobra | Apache-2.0 | https://github.com/spf13/cobra |
+| github.com/spf13/pflag | BSD-3-Clause | https://github.com/spf13/pflag |
+| go.yaml.in/yaml/v3 | Apache-2.0 AND MIT | https://github.com/yaml/go-yaml |
+| gopkg.in/check.v1 | BSD-2-Clause | https://github.com/go-check/check |
+
+Build Boundary:
+- This product is a Cloud-only client. All media processing is performed by the
+  BytePlus Cloud service; the CLI submits tasks and polls for results over
+  HTTPS.
+- The CLI performs no local media processing. It does not link, embed, invoke,
+  or redistribute any local media-processing binary or media codec library.
+- The optional self-update feature invokes the system npm/npx toolchain to
+  install published packages; Node.js itself is not embedded or redistributed.
+
+This notice is provided for informational purposes and does not modify the
+license terms of BytePlus MediaKit CLI or any third-party component.
