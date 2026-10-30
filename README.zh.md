@@ -43,13 +43,13 @@ BytePlus MediaKit 官方 CLI。对外命令为 `byteplus-mediakit-cli`。这是�
 **方式一 — 一键安装：**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli@beta install -y
+npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
 ```
 
 **方式二 — npm 全局安装：**
 
 ```bash
-npm install -g @byteplus/mediakit-cli@beta --registry=https://registry.npmjs.org/
+npm install -g @byteplus/mediakit-cli --registry=https://registry.npmjs.org/
 ```
 
 本仓库仅开源 `skills/` 中的 Skills。CLI 通过 npm 包和 GitHub Release 预编译二进制分发。
@@ -78,7 +78,7 @@ byteplus-mediakit-cli shared query-task --task-id <task_id> --poll-complete
 **第 1 步 — 安装**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli@beta install -y
+npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
 ```
 
 **第 2 步 — 非交互式初始化**

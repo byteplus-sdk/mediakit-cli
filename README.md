@@ -43,13 +43,13 @@ Choose **one** of the following methods:
 **Option 1 — one-click install:**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli@beta install -y
+npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
 ```
 
 **Option 2 — global npm install:**
 
 ```bash
-npm install -g @byteplus/mediakit-cli@beta --registry=https://registry.npmjs.org/
+npm install -g @byteplus/mediakit-cli --registry=https://registry.npmjs.org/
 ```
 
 This repository publishes the Skills in `skills/`. The CLI is distributed through npm and prebuilt GitHub Release binaries.
@@ -78,7 +78,7 @@ byteplus-mediakit-cli shared query-task --task-id <task_id> --poll-complete
 **Step 1 — Install**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli@beta install -y
+npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
 ```
 
 **Step 2 — Non-interactive initialization**
