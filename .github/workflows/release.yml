@@ -1,0 +1,222 @@
+name: Release prebuilt BP CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version matching the prepared draft release
+        required: true
+        default: 0.0.2
+        type: string
+      source_sha:
+        description: Full commit SHA of the merged and approved public payload
+        required: true
+        type: string
+      npm_sha256:
+        description: SHA-256 of the approved npm tgz
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bp-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version }}
+  SOURCE_SHA: ${{ inputs.source_sha }}
+  NPM_SHA256: ${{ inputs.npm_sha256 }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate dispatch inputs
+        run: |
+          python3 - <<'PY'
+          import os, re
+          assert os.environ["GITHUB_REF"] == "refs/heads/main", "Dispatch must use main"
+          assert re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?", os.environ["VERSION"]), "Invalid version"
+          assert re.fullmatch(r"[0-9a-f]{40}", os.environ["SOURCE_SHA"]), "Invalid source SHA"
+          assert re.fullmatch(r"[0-9a-f]{64}", os.environ["NPM_SHA256"]), "Invalid package SHA-256"
+          PY
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+
+      - name: Check release tag and download prepared assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)" = "$SOURCE_SHA"
+          mkdir -p "$RUNNER_TEMP/bp-release"
+          gh release view "$TAG" --json id,isDraft,assets > "$RUNNER_TEMP/bp-release/release.json"
+          for SYSTEM in darwin linux windows; do
+            for ARCH in amd64 arm64; do
+              EXT=tar.gz
+              if [ "$SYSTEM" = windows ]; then EXT=zip; fi
+              gh release download "$TAG" --pattern "byteplus-mediakit-cli_${VERSION}_${SYSTEM}_${ARCH}.${EXT}" --dir "$RUNNER_TEMP/bp-release"
+            done
+          done
+          gh release download "$TAG" --pattern checksums.txt --dir "$RUNNER_TEMP/bp-release"
+          if jq -e --arg name "byteplus-mediakit-cli-$VERSION.tgz" '.assets[] | select(.name == $name)' "$RUNNER_TEMP/bp-release/release.json" > /dev/null; then
+            gh release download "$TAG" --pattern "byteplus-mediakit-cli-$VERSION.tgz" --dir "$RUNNER_TEMP/bp-release"
+          else
+            ARTIFACT_NAME="bp-npm-${VERSION}-${SOURCE_SHA}-${NPM_SHA256}"
+            ARTIFACT_ID=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq "[.[].artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false)][0].id // empty")
+            test -n "$ARTIFACT_ID"
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/bp-npm.zip"
+            unzip -q "$RUNNER_TEMP/bp-npm.zip" -d "$RUNNER_TEMP/bp-release"
+          fi
+
+      - name: Verify checksums, npm contents and public Skill snapshot
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, tarfile
+          from pathlib import Path, PurePosixPath
+
+          version = os.environ["VERSION"]
+          root = Path(os.environ["RUNNER_TEMP"]) / "bp-release"
+          expected = {
+              f"byteplus-mediakit-cli_{version}_{system}_{arch}.{'zip' if system == 'windows' else 'tar.gz'}"
+              for system in ("darwin", "linux", "windows") for arch in ("amd64", "arm64")
+          }
+          checksums = (root / "checksums.txt").read_bytes()
+          entries = {}
+          for line in checksums.decode().splitlines():
+              match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(.+)", line)
+              assert match and match[2] not in entries, "Invalid or duplicate checksum"
+              entries[match[2]] = match[1].lower()
+          assert set(entries) == expected, "Expected checksums for six archives"
+          for name, checksum in entries.items():
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == checksum, f"Checksum mismatch: {name}"
+          package = root / f"byteplus-mediakit-cli-{version}.tgz"
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == os.environ["NPM_SHA256"], "npm tgz does not match approval"
+          files = {}
+          with tarfile.open(package, "r:gz") as archive:
+              for member in archive.getmembers():
+                  path = PurePosixPath(member.name)
+                  assert not path.is_absolute() and ".." not in path.parts and path.parts[0] == "package", "Unsafe npm path"
+                  assert member.isfile() or member.isdir(), "npm links are forbidden"
+                  if member.isfile():
+                      key = str(path.relative_to("package"))
+                      assert key not in files, "Duplicate npm file"
+                      files[key] = archive.extractfile(member).read()
+          pkg = json.loads(files["package.json"])
+          assert pkg["name"] == "@byteplus/mediakit-cli" and pkg["version"] == version, "Package identity mismatch"
+          assert pkg["bin"] == {"byteplus-mediakit-cli": "scripts/run.js"}, "Package bin mismatch"
+          assert pkg["scripts"] == {"postinstall": "node scripts/install.js"}, "Unexpected lifecycle scripts"
+          assert files["checksums.txt"] == checksums, "Package checksum file differs"
+          for name in ("README.md", "README.zh.md", "LICENSE", "Open Source Notice.txt"):
+              assert files[name] == Path(name).read_bytes(), f"Public root mismatch: {name}"
+          skills = {p.as_posix(): p.read_bytes() for p in Path("skills").rglob("*") if p.is_file()}
+          packaged_skills = {name: content for name, content in files.items() if name.startswith("skills/")}
+          assert skills == packaged_skills, "npm Skills differ from approved commit"
+          assert {p.name for p in Path("skills").iterdir()} == {f"byted-bp-mediakit-{name}" for name in ("shared", "editing", "audio", "image", "video")}, "Expected five Skills"
+          wrappers = {f"scripts/{name}" for name in ("install-wizard.js", "install.js", "install.sh", "install.test.js", "run.js")}
+          allowed = {"README.md", "README.zh.md", "LICENSE", "Open Source Notice.txt", "package.json", "checksums.txt"} | wrappers | set(skills)
+          assert set(files) == allowed, "Unexpected or missing npm files"
+          destination = Path(os.environ["RUNNER_TEMP"]) / "bp-package"
+          for name, content in files.items():
+              path = destination / name
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(content)
+          print("PASS: six archives, npm package and five Skills match approval")
+          PY
+          for SCRIPT in "$RUNNER_TEMP/bp-package/scripts/"*.js; do node --check "$SCRIPT"; done
+          bash -n "$RUNNER_TEMP/bp-package/scripts/install.sh"
+
+      - name: Preserve verified npm package for resumable publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: bp-npm-${{ inputs.version }}-${{ inputs.source_sha }}-${{ inputs.npm_sha256 }}
+          path: ${{ runner.temp }}/bp-release/byteplus-mediakit-cli-${{ inputs.version }}.tgz
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+      - name: Remove staging npm asset and publish binary release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          gh release view "$TAG" --json assets,isDraft > "$RUNNER_TEMP/bp-release/current.json"
+          if jq -e --arg name "byteplus-mediakit-cli-$VERSION.tgz" '.assets[] | select(.name == $name)' "$RUNNER_TEMP/bp-release/current.json" > /dev/null; then
+            gh release delete-asset "$TAG" "byteplus-mediakit-cli-$VERSION.tgz" --yes
+          fi
+          gh release view "$TAG" --json assets > "$RUNNER_TEMP/bp-release/current.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          version = os.environ["VERSION"]
+          assets = json.loads((Path(os.environ["RUNNER_TEMP"]) / "bp-release/current.json").read_text())["assets"]
+          expected = {"checksums.txt"} | {f"byteplus-mediakit-cli_{version}_{s}_{a}.{'zip' if s == 'windows' else 'tar.gz'}" for s in ("darwin", "linux", "windows") for a in ("amd64", "arm64")}
+          assert {a["name"] for a in assets} == expected and len(assets) == 7, "Release must contain exactly seven assets"
+          PY
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
+
+      - name: Verify anonymous release downloads
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, urllib.request
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "bp-release"
+          names = [p.name for p in root.iterdir() if p.name.endswith((".tar.gz", ".zip"))] + ["checksums.txt"]
+          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{os.environ['VERSION']}"
+          for name in names:
+              data = urllib.request.urlopen(f"{base}/{name}", timeout=60).read()
+              assert hashlib.sha256(data).digest() == hashlib.sha256((root / name).read_bytes()).digest(), f"Public download mismatch: {name}"
+          print("PASS: seven anonymous release downloads")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish approved npm tgz once
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PACKAGE="$RUNNER_TEMP/bp-release/byteplus-mediakit-cli-$VERSION.tgz"
+          LOCAL_INTEGRITY=$(node -e 'const fs=require("fs"),c=require("crypto");process.stdout.write("sha512-"+c.createHash("sha512").update(fs.readFileSync(process.argv[1])).digest("base64"))' "$PACKAGE")
+          STATUS=$(curl -sS -o "$RUNNER_TEMP/bp-registry.json" -w '%{http_code}' "https://registry.npmjs.org/@byteplus%2fmediakit-cli/$VERSION")
+          if [[ "$VERSION" == *-* ]]; then DIST_TAG=beta; else DIST_TAG=latest; fi
+          if [ "$STATUS" = 200 ]; then
+            test "$(jq -r .dist.integrity "$RUNNER_TEMP/bp-registry.json")" = "$LOCAL_INTEGRITY"
+            npm dist-tag add "@byteplus/mediakit-cli@$VERSION" "$DIST_TAG" --registry https://registry.npmjs.org
+            echo "Matching version already published; skipped duplicate publish."
+          elif [ "$STATUS" = 404 ]; then
+            npm publish "$PACKAGE" --access public --tag "$DIST_TAG" --registry https://registry.npmjs.org
+          else
+            echo "Registry lookup returned HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Verify npm tarball and dist-tag
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, urllib.request
+          from pathlib import Path
+          version = os.environ["VERSION"]
+          data = json.load(urllib.request.urlopen("https://registry.npmjs.org/@byteplus%2fmediakit-cli", timeout=60))
+          tag = "beta" if "-" in version else "latest"
+          assert data["dist-tags"][tag] == version, "Dist-tag mismatch"
+          remote = urllib.request.urlopen(data["versions"][version]["dist"]["tarball"], timeout=60).read()
+          local = (Path(os.environ["RUNNER_TEMP"]) / "bp-release" / f"byteplus-mediakit-cli-{version}.tgz").read_bytes()
+          assert hashlib.sha256(remote).digest() == hashlib.sha256(local).digest(), "npm tarball mismatch"
+          print("PASS: npm tarball and dist-tag")
+          PY
