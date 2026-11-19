@@ -1,0 +1,46 @@
+name: Public payload CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate public files and five Skills
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          roots = {"skills", "README.md", "README.zh.md", "LICENSE", "Open Source Notice.txt", ".github", ".git"}
+          skills = {f"byted-bp-mediakit-{name}" for name in ("shared", "editing", "audio", "image", "video")}
+          workflows = {".github/workflows/ci.yml", ".github/workflows/release.yml"}
+          assert {p.name for p in Path(".").iterdir()} <= roots, "Unexpected public root files"
+          assert {p.name for p in Path("skills").iterdir()} == skills, "Expected exactly five Skills"
+          for name in roots - {"skills", ".github", ".git"}:
+              assert Path(name).is_file(), f"Missing {name}"
+          for skill in skills:
+              for name in ("SKILL.md", "LICENSE"):
+                  assert (Path("skills") / skill / name).is_file(), f"Missing {skill}/{name}"
+          found_workflows = set()
+          for path in Path(".").rglob("*"):
+              if ".git" in path.parts:
+                  continue
+              assert not path.is_symlink(), f"Public symlink: {path}"
+              if not path.is_file():
+                  continue
+              if path.parts[0] == ".github":
+                  found_workflows.add(path.as_posix())
+                  assert path.as_posix() in workflows, f"Unexpected workflow file: {path}"
+              assert not {"scripts", "tools", "cmd", "internal", "bin", "vendor", "node_modules"}.intersection(path.parts), f"Forbidden public path: {path}"
+              assert path.suffix not in {".go", ".tgz", ".zip", ".exe"} and not path.name.endswith(".tar.gz"), f"Forbidden public file: {path}"
+          assert found_workflows == workflows, "Missing expected workflow"
+          print("PASS: public files and five Skills")
+          PY

@@ -1,8 +1,8 @@
 ---
 name: byted-bp-mediakit-editing
-version: "0.0.1"
-license: "Apache-2.0"
-description: "Use this skill first for hands-on editing of an existing clip, recording, voice note, or set of photos — load it before asking for files, paths, or timestamps. Use it to trim video or audio to one moment or a middle section; stitch, join, or merge clips, takes, or voice notes end to end in order into one file; turn still photos into a slideshow or a video moment into a GIF. Sound: change speed while keeping the voice natural, adjust or fade volume including a video's own soundtrack without touching the picture, mix a voiceover over music, extract a video's soundtrack into its own file, or swap in a new track. Picture: add a logo or watermark, burn captions or subtitles into the frames, place videos side by side, crop to vertical 9:16, rotate or mirror sideways footage, blur a region like a license plate, or apply a warm cinematic look."
+version: "0.0.2"
+license: "SEE LICENSE IN LICENSE"
+description: "Use this skill to trim, join, crop, rotate, flip, speed up, slow down, filter or compose existing media, add subtitles or overlays, apply a camera motion, or create a scrolling-text video."
 permissions:
   - shell
 metadata:
@@ -11,33 +11,19 @@ metadata:
   cliHelp: "byteplus-mediakit-cli editing --help"
   product: "byteplus-mediakit-cli/skills"
   domain: editing
-  capability_count: 22
+  capability_count: 24
 ---
 # editing MediaKit Skill
 
-## Rules
-
 1. Read `../byted-bp-mediakit-shared/SKILL.md` first and run the shared checks. Stop if that Skill is missing.
-2. Choose only from the `editing` table below. Distinguish similar tools by each tool's description and parameter bounds.
-3. Read the matching reference before calling. Approved copy and the live CLI `--schema` are the contract; do not invent fields.
-4. Execute when the user provides a real media URL/path, a clear tool intent, and every required business parameter that has no documented default (or can be derived from the wording / a prior step). Ask for missing required parameters before submitting. Optional fields with documented defaults may be omitted so Cloud defaults apply — do not invent non-default values. Optional shared fields (`callback_*`, `client_token`, `queue_id`) may be passed only when the user provides them.
-5. Before execution, set `MEDIAKIT_BYTEPLUS_SURFACE=skill` on the same command line to mark Skill-driven calls.
-6. Before execution, set `MEDIAKIT_BYTEPLUS_RUNTIME=<runtime>` on the same command line; use `unknown` when the Agent host cannot be determined reliably.
 
-## Clarification and cross-domain routing
+Read the shared setup and the relevant capability reference. Inspect source metadata when time, dimensions or frame rate affect the operation. For intervals, use seconds and preserve each documented ordering relation; apply nested relations independently to every array element.
 
-If only a media type is given and the user has not said whether to cut, join, overlay, or adjust, clarify first. Picture enhancement, burned-in subtitle removal, and face-identity blur belong to video. Audio format conversion and vocal isolation belong to audio.
+Supply subtitle content through a subtitle file or the structured subtitles array. The file takes priority when both are provided. Use the documented position and style controls; do not infer arbitrary coordinates or text styling from a preset. Select fonts, filters, transitions and camera motions through their approved semantic-to-ID mappings.
 
-Multi-step mixed tasks that start with editing operations (trim, crop, flip, rotate, adjust-video-volume, apply-video-filter, add-subtitle, etc.) are owned by this Skill first: load editing, run the editing steps, then hand off to video/audio Skills for later enhance/transcode/separate-voice steps. Do not abandon editing for video merely because a later step is enhance or transcode.
+Use apply-camera-motion for zoom, pan-zoom, orbit-360 or bounce, with optional start and end times. Use text-to-scrolling-video for a 9:16 scrolling-text video. Keep important background content outside its top and bottom masking regions and choose readable text contrast.
 
-## Execution policy
-
-- Prefer execution over clarification when required parameters are present or documented defaults cover them. If a required field has no default and was not provided, ask — do not invent it.
-- Multi-step requests: before submitting **any** step, check that every later step's required-no-default business parameters are already known (user wording or a prior step output). If a later step still needs user-provided required content (for example subtitle text/`subtitle_url` for add-subtitle-to-video, crop rectangle, flip axis, rotate direction, highlight `target_duration`), ask for it first and do **not** submit earlier steps in parallel. Once the full chain is runnable, run tools in the user's stated order; after each async task reaches a terminal state, pass `result.video_url` / `result.audio_url` / `result.voice_audio_url` (whichever the next tool requires) into the next step. Do not invent intermediate URLs. Do not pause mid-chain to ask about optional or documented-default fields on later steps.
-- Ambiguous goals that could mean different tools (for example “make the video smaller” could mean crop, bitrate transcode, quality enhance, or martencode): ask which treatment the user wants; do not submit any of those tools until they choose.
-
-- If you already asked a clarifying question and the user has not answered, stop. Do not submit any business call, invent a default choice, or “proceed anyway”.
-- Never silently clamp, truncate, pad, or drop values to fit a documented limit (bitrate, sample rate, character length, item count). Clarify or refuse; do not submit an altered request.
+Prefer a UTF-8 JSON file for structured subtitles, overlays, video lists and other nested settings. Inline JSON, @file, stdin and file URI must describe the same typed values. Preserve commas and quotation marks inside CSV string values. Keep the task ID for asynchronous results and query through the shared protocol.
 
 ## Tools
 
@@ -48,6 +34,7 @@ Multi-step mixed tasks that start with editing operations (trim, crop, flip, rot
 | adjust-audio-speed | Adjusts the playback speed of an audio file to produce fast-forward or slow-motion effects while keeping the pitch natural. | Cloud | `byteplus-mediakit-cli editing adjust-audio-speed` | [reference/adjust-audio-speed.md](reference/adjust-audio-speed.md) |
 | adjust-video-speed | Adjusts video playback speed to produce fast-forward or slow-motion effects. | Cloud | `byteplus-mediakit-cli editing adjust-video-speed` | [reference/adjust-video-speed.md](reference/adjust-video-speed.md) |
 | adjust-video-volume | Adjusts the volume of a video. The output video is in MP4 format and keeps the same resolution as the source video. | Cloud | `byteplus-mediakit-cli editing adjust-video-volume` | [reference/adjust-video-volume.md](reference/adjust-video-volume.md) |
+| apply-camera-motion | Add a zoom, pan-and-zoom, orbit or bounce effect to a video, with optional control over the affected time range. | Cloud | `byteplus-mediakit-cli editing apply-camera-motion` | [reference/apply-camera-motion.md](reference/apply-camera-motion.md) |
 | apply-video-filter | Applies a filter effect to a specified video. | Cloud | `byteplus-mediakit-cli editing apply-video-filter` | [reference/apply-video-filter.md](reference/apply-video-filter.md) |
 | concat-audio | Joins multiple audio files into a single complete audio file. The input audio files are joined in order. | Cloud | `byteplus-mediakit-cli editing concat-audio` | [reference/concat-audio.md](reference/concat-audio.md) |
 | concat-video | Joins video clips in a specified order and can apply transition effects at the joins to create a seamless final video. | Cloud | `byteplus-mediakit-cli editing concat-video` | [reference/concat-video.md](reference/concat-video.md) |
@@ -63,5 +50,6 @@ Multi-step mixed tasks that start with editing operations (trim, crop, flip, rot
 | mux-audio-video | Combines an input audio stream and a video stream into a new video file. | Cloud | `byteplus-mediakit-cli editing mux-audio-video` | [reference/mux-audio-video.md](reference/mux-audio-video.md) |
 | rotate-video | Rotates a video. | Cloud | `byteplus-mediakit-cli editing rotate-video` | [reference/rotate-video.md](reference/rotate-video.md) |
 | stitch-video | Spatially combines the input videos horizontally or vertically to produce a single composited video, ideal for scenarios such as multi-view comparison and frame composition. The output video duration matches the longest input video, and shorter input videos are padded with a black screen after playback finishes. Output audio mixes the audio tracks of all input videos whose keep_audio value is true. | Cloud | `byteplus-mediakit-cli editing stitch-video` | [reference/stitch-video.md](reference/stitch-video.md) |
+| text-to-scrolling-video | Turn text and a background image into a vertical scrolling-text video, with optional background music and timing controls. | Cloud | `byteplus-mediakit-cli editing text-to-scrolling-video` | [reference/text-to-scrolling-video.md](reference/text-to-scrolling-video.md) |
 | trim-audio | Extracts a specified segment from an input audio file based on the given start and end times. | Cloud | `byteplus-mediakit-cli editing trim-audio` | [reference/trim-audio.md](reference/trim-audio.md) |
 | trim-video | Extracts a specified segment from an input video based on the given start and end times. | Cloud | `byteplus-mediakit-cli editing trim-video` | [reference/trim-video.md](reference/trim-video.md) |
