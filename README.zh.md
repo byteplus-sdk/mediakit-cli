@@ -1,30 +1,32 @@
 # BytePlus MediaKit CLI
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/go-%3E%3D1.22-blue.svg)](https://go.dev/)
 [![npm version](https://img.shields.io/npm/v/@byteplus/mediakit-cli.svg)](https://www.npmjs.com/package/@byteplus/mediakit-cli)
 
 [English](./README.md) | [中文版](./README.zh.md)
 
-BytePlus MediaKit 官方 CLI。对外命令为 `byteplus-mediakit-cli`。这是纯云端命令面，既能完成裁剪 / 拼接 / 加字幕 / 混音 / 提取音频等剪辑操作，也能调用画质增强、字幕擦除、高光智剪、场景切分等 AI 能力。目前已覆盖视频、剪辑、音频等多模态原子能力和 4 个 AI Agent [Skills](./skills/)。
+BytePlus MediaKit 官方 CLI。对外命令为 `byteplus-mediakit-cli`。这是纯云端命令面，既能完成裁剪 / 拼接 / 加字幕 / 混音 / 提取音频等剪辑操作，也能调用画质增强、字幕擦除、高光智剪、场景切分等 AI 能力。二期 `0.0.2` 覆盖音频、剪辑、图片、视频和通用领域的 75 项能力，随包提供 5 个 AI Agent [Skills](./skills/)。
 
 [安装](#安装与快速开始) · [AI Agent Skills](#agent-skills) · [鉴权](#鉴权) · [命令结构](#命令结构) · [进阶用法](#进阶用法) · [许可证](#许可证)
 
 ## 为什么选 byteplus-mediakit-cli？
 
-- **完备的能力矩阵**：横跨视频、剪辑、音频三大模态，从裁剪 / 拼接 / 加字幕等底层处理，到画质增强、字幕擦除、高光智剪、场景切分等上层理解，一条命令覆盖预处理到成片输出的全链路。
+- **完备的能力矩阵**：覆盖视频、剪辑、音频和图片，从裁剪 / 拼接 / 加字幕等处理，到画质增强、字幕擦除、高光智剪、场景切分等理解，使用同一命令结构完成处理。
 - **纯云端，同一命令面**：同一条 `<domain> <tool>` 命令走云端弹性算力，覆盖剪辑与 AI 原子能力。云端结果以 URL 返回；异步工具返回 `task_id` 供轮询。
-- **面向 Agent 的 Skills**：随包装载 4 个 AI Agent Skills，Agent 可完成安装、鉴权、选工具、轮询异步任务，无需第二套命令面。
+- **面向 Agent 的 Skills**：随包装载 5 个 AI Agent Skills，Agent 可完成安装、鉴权、选工具、轮询异步任务，无需第二套命令面。
 - **高性价比处理**：依托云端弹性资源调度，为大批量媒体任务提供有竞争力的价格，降低 AI 应用的整体运行成本。
 
 ## 功能
 
 | 领域                | 能力                                                                                                                                                                                                                               | 运行 |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| 🎬 **剪辑** (22)    | 视频加图片 · 视频加字幕 · 音频调速 · 视频调速 · 调整视频音量 · 视频添加滤镜 · 音频拼接 · 视频拼接 · 视频画面裁剪 · 视频截取动图 · 提取音频 · 音频声音淡入淡出 · 视频声音淡入淡出 · 视频画面翻转 · 视频高斯模糊 · 图片转视频 · 音频混合 · 视频加音频 · 视频画面旋转 · 视频画面拼接 · 音频裁剪 · 视频裁剪 | 云端 |
-| 🎚️ **音频** (2)    | 人声背景音分离 · 音频转码                                                                                                                                                                                                          | 云端 |
-| 🎥 **智能视频** (11)| 画质增强 · 视频画质增强极速版 · 精细化字幕擦除 · 视频抽帧 · 视频人脸打码 · 极智超清 · 视频转封装 · 场景切分 · 视频转码 · 视频插帧 · 高光智剪                                                                                         | 云端 |
-| 🔧 **通用** (1)     | 异步任务查询                                                                                                                                                                                                                       | 云端 |
+| 🎬 **剪辑** (24)    | 裁剪、拼接、字幕、滤镜、运镜、混音、画面合成及文字滚屏视频 | 云端 |
+| 🎚️ **音频** (4)    | 语音活动检测、音频信息探测、人声背景音分离及音频转码 | 云端 |
+| 🖼️ **图片** (22)   | 图片信息探测、OCR、质量检测、缩放压缩、裁剪旋转、颜色锐化、背景移除、隐私打码及水印 | 云端 |
+| 🎥 **视频** (24)   | 视频信息探测、画质检测增强、字幕擦除、抽帧、隐私打码、转码转封装、抠像、深度图、场景与语义分段、剧本整理及视频理解 | 云端 |
+| 🔧 **通用** (1)    | 模型代理调用；另提供异步任务查询命令 | 云端 |
+
+完整工具清单见[英文能力索引](./README.md#capabilities)。使用 `byteplus-mediakit-cli --help-full` 查看全部入口，使用 `<domain> <tool> --schema` 查看参数。
 
 ## 安装与快速开始
 
@@ -43,16 +45,15 @@ BytePlus MediaKit 官方 CLI。对外命令为 `byteplus-mediakit-cli`。这是�
 **方式一 — 一键安装：**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
+npx @byteplus/mediakit-cli install -y
 ```
 
 **方式二 — npm 全局安装：**
 
 ```bash
-npm install -g @byteplus/mediakit-cli --registry=https://registry.npmjs.org/
+npm install --global @byteplus/mediakit-cli@0.0.2
+byteplus-mediakit-cli --version
 ```
-
-本仓库仅开源 `skills/` 中的 Skills。CLI 通过 npm 包和 GitHub Release 预编译二进制分发。
 
 #### 配置与使用
 
@@ -78,7 +79,7 @@ byteplus-mediakit-cli shared query-task --task-id <task_id> --poll-complete
 **第 1 步 — 安装**
 
 ```bash
-npx --registry=https://registry.npmjs.org/ @byteplus/mediakit-cli install -y
+npx @byteplus/mediakit-cli install -y
 ```
 
 **第 2 步 — 非交互式初始化**
@@ -106,9 +107,10 @@ npx @byteplus/mediakit-cli install --skills-only -y
 
 | Skill                       | 说明                                                                                                                                                                                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `byted-bp-mediakit-shared`  | 通用能力：云端鉴权与查询任务，其他 Skill 均需依赖                                                                                                                                                                                 |
+| `byted-bp-mediakit-shared`  | 通用能力：安装、云端鉴权、模型代理调用及查询任务，其他 Skill 均需依赖 |
 | `byted-bp-mediakit-editing` | 剪辑：视频加图片、视频加字幕、音频调速、视频调速、调整视频音量、视频添加滤镜、音频拼接、视频拼接、视频画面裁剪、视频截取动图、提取音频、音频声音淡入淡出、视频声音淡入淡出、视频画面翻转、视频高斯模糊、图片转视频、音频混合、视频加音频、视频画面旋转、视频画面拼接、音频裁剪、视频裁剪 |
-| `byted-bp-mediakit-audio`   | 音频：人声背景音分离、音频转码                                                                                                                                                                                                    |
+| `byted-bp-mediakit-audio`   | 音频：语音活动检测、音频信息探测、人声背景音分离及音频转码 |
+| `byted-bp-mediakit-image`   | 图片：信息探测、OCR、质量检测、基础编辑、背景移除、隐私打码及水印 |
 | `byted-bp-mediakit-video`   | 智能视频：画质增强、视频画质增强极速版、精细化字幕擦除、视频抽帧、视频人脸打码、极智超清、视频转封装、场景切分、视频转码、视频插帧、高光智剪                                                                                     |
 
 通过 Skill 执行真实云端业务命令或 `shared query-task` 时，必须在同一条命令行注入：
@@ -178,7 +180,7 @@ byteplus-mediakit-cli editing trim-video --schema
 
 ## 许可证
 
-`skills/` 中的 Skills 基于 **Apache License 2.0** 开源，详见各 Skill 的 LICENSE。CLI 的使用受根目录 LICENSE 所列条款约束。
+本项目基于 **Apache License 2.0** 开源。
 
 该软件运行时会调用 BytePlus MediaKit 云端 API，使用这些 API 需要遵守如下协议：
 
