@@ -70,7 +70,7 @@ jobs:
             gh release download "$TAG" --pattern "byteplus-mediakit-cli-$VERSION.tgz" --dir "$RUNNER_TEMP/bp-release"
           else
             ARTIFACT_NAME="bp-npm-${VERSION}-${SOURCE_SHA}-${NPM_SHA256}"
-            ARTIFACT_ID=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq "[.[].artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false)][0].id // empty")
+            ARTIFACT_ID=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false) | .id" | sed -n '1p')
             test -n "$ARTIFACT_ID"
             gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/bp-npm.zip"
             unzip -q "$RUNNER_TEMP/bp-npm.zip" -d "$RUNNER_TEMP/bp-release"
